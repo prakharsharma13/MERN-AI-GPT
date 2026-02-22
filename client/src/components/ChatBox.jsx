@@ -87,7 +87,11 @@ const ChatBox = () => {
         {messages.length === 0 && (
           <div className="h-full flex flex-col items-center justify-center gap-2 text-primary">
             <img
-              src={theme === "dark" ? assets.logo_full : assets.logo_full_dark}
+              src={
+                theme === "dark"
+                  ? assets.nexus_logo_full
+                  : assets.nexus_logo_full_dark
+              }
               alt=""
               className="w-full max-w-56 sm:max-w-68"
             />
@@ -123,7 +127,10 @@ const ChatBox = () => {
       )}
 
       {/**Prompt Input Box */}
-      <form onSubmit={onSubmit} className="bg-primary/20 dark:bg-[#583C79]/30 border border-primary dark:border-[#80609F]/30 rounded-full w-full max-w-2xl p-3 pl-4 mx-auto flex gap-4 items-center">
+      <form
+        onSubmit={onSubmit}
+        className="bg-primary/20 dark:bg-[#583C79]/30 border border-primary dark:border-[#80609F]/30 rounded-full w-full max-w-2xl p-3 pl-4 mx-auto flex gap-4 items-center"
+      >
         <select
           className="text-sm pl-3 pr-2 outline-none"
           onChange={(e) => setMode(e.target.value)}
