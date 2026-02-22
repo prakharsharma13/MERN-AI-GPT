@@ -85,7 +85,7 @@ export const imageMessageController = async (req, res) => {
         });
 
         //Convert to base64
-        const base64Image = `data:image/png;base64, ${Buffer.from(
+        const base64Image = `data:image/png;base64,${Buffer.from(
             aiImageResponse.data,
             "binary"
         ).toString("base64")}`;

@@ -2,11 +2,59 @@ import React, { useState } from "react";
 import { useAppContext } from "../context/AppContext";
 import { assets } from "../assets/assets";
 import moment from "moment";
+import toast from "react-hot-toast";
 
 const Sidebar = ({ isMenuOpen, setIsMenuOpen }) => {
-  const { chats, setSelectedChat, theme, setTheme, user, navigate } =
-    useAppContext();
+  const {
+    chats,
+    setSelectedChat,
+    theme,
+    setTheme,
+    user,
+    navigate,
+    createNewChat,
+    axios,
+    setChats,
+    fetchUsersChat,
+    token,
+    setToken,
+  } = useAppContext();
   const [search, setSearch] = useState("");
+
+  const logout = () => {
+    localStorage.removeItem("token");
+    setToken(null);
+    toast.success("Logged out successfully!");
+  };
+
+  const deleteChat = async (e, chatId) => {
+    e.stopPropagation();
+    try {
+      const confirm = window.confirm(
+        "Are you sure you want to delete this chat ?",
+      );
+
+      if (!confirm) return;
+
+      const { data } = await axios.post(
+        "/api/chat/delete",
+        { chatId },
+        {
+          headers: { Authorization: token },
+        },
+      );
+
+      if (data.success) {
+        setChats((prev) => prev.filter((chat) => chat._id !== chatId));
+        await fetchUsersChat();
+        toast.success(data.message);
+      }else{
+        toast.error(data.message)
+      }
+    } catch (error) {
+      toast.error(error.message);
+    }
+  };
 
   return (
     <div
@@ -14,12 +62,12 @@ const Sidebar = ({ isMenuOpen, setIsMenuOpen }) => {
     >
       {/**Logo */}
       <img
-        src={theme === "dark" ? assets.logo_full : assets.logo_full_dark}
+        src={theme === "dark" ? assets.nexus_logo_full : assets.nexus_logo_full_dark}
         alt=""
         className="w-full max-w-48"
       />
 
-      <button className="flex justify-center items-center w-full py-2 mt-10 text-white bg-linear-to-r from-[#A456F7] to-[#3D81F6] text-sm rounded-md cursor-pointer">
+      <button onClick={createNewChat} className="flex justify-center items-center w-full py-2 mt-10 text-white bg-linear-to-r from-[#A456F7] to-[#3D81F6] text-sm rounded-md cursor-pointer">
         <span className="mr-2 text-xl">+</span> New Chat
       </button>
 
@@ -67,6 +115,11 @@ const Sidebar = ({ isMenuOpen, setIsMenuOpen }) => {
                 </p>
               </div>
               <img
+                onClick={(e) =>
+                  toast.promise(deleteChat(e, chat._id), {
+                    loading: "deleting...",
+                  })
+                }
                 src={assets.bin_icon}
                 className="hidden group-hover:block w-4 cursor-pointer not-dark:invert"
                 alt=""
@@ -105,7 +158,7 @@ const Sidebar = ({ isMenuOpen, setIsMenuOpen }) => {
         <div className="flex flex-col text-sm">
           <p>Credits : {user?.credits}</p>
           <p className="text-xs text-gray-400">
-            Purchase credits to use quickgpt
+            Purchase credits to use Nexus
           </p>
         </div>
       </div>
@@ -138,6 +191,7 @@ const Sidebar = ({ isMenuOpen, setIsMenuOpen }) => {
           <img
             src={assets.logout_icon}
             className="h-5 cursor-pointer hidden not-dark:invert group-hover:block"
+            onClick={logout}
           />
         )}
       </div>
