@@ -23,7 +23,7 @@ flowchart TD
       E --> F[Services]
       F --> G[OpenAI API]
       F --> H[ImageKit]
-      F --> I[Payments (Stripe)]
+      F --> I["Payments (Stripe)"]
       E --> J[MongoDB (models: User, Chat, Transaction)]
       J --> E
    end
