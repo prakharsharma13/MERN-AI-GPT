@@ -42,9 +42,9 @@ export const textMessageController = async (req, res) => {
     };
 
     chat.messages.push(reply);
-    res.json({ success: true, reply });
     await chat.save();
     await User.updateOne({ _id: userId }, { $inc: { credits: -1 } });
+    res.json({ success: true, reply });
   } catch (error) {
     res.json({ success: false, message: error.message });
   }
@@ -106,11 +106,11 @@ export const imageMessageController = async (req, res) => {
       isPublished,
     };
 
-    res.json({ success: true, reply });
     chat.messages.push(reply);
     await chat.save();
 
     await User.updateOne({ _id: userId }, { $inc: { credits: -2 } });
+    res.json({ success: true, reply });
   } catch (error) {
     res.json({ success: false, message: error.message });
   }
