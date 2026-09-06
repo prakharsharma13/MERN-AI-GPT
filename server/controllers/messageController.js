@@ -1,8 +1,6 @@
-import axios from "axios";
 import openai from "../configs/openai.js";
 import Chat from "../models/Chat.js";
 import User from "../models/User.js";
-import imagekit from "../configs/imagekit.js";
 
 //Text generation
 export const textMessageController = async (req, res) => {
@@ -80,27 +78,9 @@ export const imageMessageController = async (req, res) => {
       process.env.IMAGEKIT_URL_ENDPOINT
     }/ik-genimg-prompt-${encodedPrompt}/quickgpt/${Date.now()}.png?tr=w-800,h-800`;
 
-    //Trigger generation by fetching from Imagekit
-    const aiImageResponse = await axios.get(generatedImageUrl, {
-      responseType: "arraybuffer",
-    });
-
-    //Convert to base64
-    const base64Image = `data:image/png;base64,${Buffer.from(
-      aiImageResponse.data,
-      "binary",
-    ).toString("base64")}`;
-
-    //upload to imagekit media library
-    const uploadResponse = await imagekit.upload({
-      file: base64Image,
-      fileName: `${Date.now()}.png`,
-      folder: "quickgpt",
-    });
-
     const reply = {
       role: "assistant",
-      content: uploadResponse.url,
+      content: generatedImageUrl,
       timestamp: Date.now(),
       isImage: true,
       isPublished,
