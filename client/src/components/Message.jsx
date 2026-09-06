@@ -4,39 +4,72 @@ import moment from "moment";
 import Markdown from "react-markdown";
 import Prism from "prismjs";
 
-const RETRY_DELAY_MS = 3000;
-const MAX_RETRIES = 12;
+const POLL_INTERVAL_MS = 5000;
+const DEADLINE_MS = 180000; // generation measured at ~60s; generous headroom
 
-// ImageKit serves a text placeholder for the first few seconds while it
-// generates. The placeholder is cached for only 10s, so remounting the
-// <img> after a short delay eventually picks up the real image.
 const GeneratedImage = ({ src }) => {
-  const [attempt, setAttempt] = useState(0);
-  const [failed, setFailed] = useState(false);
+  const [status, setStatus] = useState("generating"); // generating | ready | failed
+  const [error, setError] = useState("");
 
-  if (failed) {
+  useEffect(() => {
+    let cancelled = false;
+    const deadline = Date.now() + DEADLINE_MS;
+
+    const poll = async () => {
+      while (!cancelled && Date.now() < deadline) {
+        try {
+          const res = await fetch(src);
+          const type = res.headers.get("content-type") || "";
+
+          // Ready
+          if (res.ok && type.startsWith("image/")) {
+            if (!cancelled) setStatus("ready");
+            return;
+          }
+
+          // Permanent failure (403 quota, etc) - stop, don't burn the budget
+          if (!res.ok) {
+            const body = (await res.text()).trim();
+            if (!cancelled) {
+              setError(body || `Image service returned ${res.status}`);
+              setStatus("failed");
+            }
+            return;
+          }
+
+          // 200 + non-image = placeholder, still generating: keep polling
+        } catch {
+          // transient network error: keep polling
+        }
+
+        await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+      }
+
+      if (!cancelled) {
+        setError("Image generation timed out. Please try again.");
+        setStatus("failed");
+      }
+    };
+
+    poll();
+    return () => {
+      cancelled = true;
+    };
+  }, [src]);
+
+  if (status === "failed") {
+    return <p className="text-sm text-red-400 mt-2">{error}</p>;
+  }
+
+  if (status === "generating") {
     return (
-      <p className="text-sm text-red-400">
-        This image could not be generated. Please try the prompt again.
-      </p>
+      <div className="flex h-48 w-full max-w-md items-center justify-center rounded-md bg-black/20 text-xs text-gray-400 mt-2">
+        Generating image… this can take up to a minute
+      </div>
     );
   }
 
-  return (
-    <img
-      key={attempt}
-      src={src}
-      alt="Generated image"
-      className="w-full max-w-md mt-2 rounded-md min-h-40 bg-black/20"
-      onError={() => {
-        if (attempt >= MAX_RETRIES) {
-          setFailed(true);
-          return;
-        }
-        setTimeout(() => setAttempt((a) => a + 1), RETRY_DELAY_MS);
-      }}
-    />
-  );
+  return <img src={src} alt="" className="w-full max-w-md mt-2 rounded-md" />;
 };
 
 const Message = ({ message }) => {
