@@ -14,7 +14,13 @@ export const AppContextProvider = ({ children }) => {
   const [chats, setChats] = useState([]);
   const [selectedChat, setSelectedChat] = useState(null);
   const [theme, setTheme] = useState(localStorage.getItem("theme") || "light");
-  const [token, setToken] = useState(localStorage.getItem("token") || null);
+  const [token, setToken] = useState(() => {
+    const stored = localStorage.getItem("token");
+    if (!stored || stored === "undefined" || stored === "null") {
+      localStorage.removeItem("token");
+      return null;
+    }
+  });
   const [loadingUser, setLoadingUser] = useState(true);
 
   const fetchUser = async () => {
