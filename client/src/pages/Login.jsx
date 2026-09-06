@@ -16,14 +16,18 @@ const Login = () => {
     try {
       const { data } = await axios.post(url, { name, email, password });
 
-      if (data.success) {
+      if (
+        data.success === true &&
+        typeof data.token === "string" &&
+        data.token
+      ) {
         setToken(data.token);
         localStorage.setItem("token", data.token);
       } else {
-        toast.error(data.message);
+        toast.error(data.message || "Something went wrong, please try again.");
       }
     } catch (error) {
-      toast.error(error.message);
+      toast.error(error.response?.data?.message || error.message);
     }
   };
   return (
