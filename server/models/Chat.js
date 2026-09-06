@@ -5,18 +5,17 @@ const ChatSchema = new mongoose.Schema(
     userId: { type: String, ref: "User", required: true },
     userName: { type: String, required: true },
     name: { type: String, required: true },
-    name: { type: String, required: true },
     messages: [
       {
         isImage: { type: Boolean, required: true },
         isPublished: { type: Boolean, default: false },
         role: { type: String, required: true },
-        content: {type: String, required: true},
-        timestamps: { type: Number, reuired: true },
+        content: { type: String, required: true },
+        timestamps: { type: Number, default: Date.now },
       },
     ],
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 const Chat = mongoose.model("Chat", ChatSchema);

@@ -84,20 +84,20 @@ export const getPublishedImages = async (req, res) => {
       { $unwind: "$messages" },
       {
         $match: {
-          "message.isImage": true,
-          "message.isPublished": true,
+          "messages.isImage": true,
+          "messages.isPublished": true,
         },
       },
       {
         $project: {
           _id: 0,
           imageUrl: "$messages.content",
-          userName: "$username",
+          userName: "$userName",
         },
       },
     ]);
     res.json({ success: true, images: publishedImageMessages.reverse() });
   } catch (error) {
-    res.json({ success: false, error: error.message });
+    res.json({ success: false, message: error.message });
   }
 };
