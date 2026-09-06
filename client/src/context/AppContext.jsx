@@ -14,7 +14,13 @@ export const AppContextProvider = ({ children }) => {
   const [chats, setChats] = useState([]);
   const [selectedChat, setSelectedChat] = useState(null);
   const [theme, setTheme] = useState(localStorage.getItem("theme") || "light");
-  const [token, setToken] = useState(localStorage.getItem("token") || null);
+  const [token, setToken] = useState(() => {
+    const stored = localStorage.getItem("token");
+    if (!stored || stored === "undefined" || stored === "null") {
+      localStorage.removeItem("token");
+      return null;
+    }
+  });
   const [loadingUser, setLoadingUser] = useState(true);
 
   const fetchUser = async () => {
@@ -29,7 +35,13 @@ export const AppContextProvider = ({ children }) => {
         toast.error(data.message);
       }
     } catch (error) {
-      toast.error(error.message);
+      if (error.response?.status === 401) {
+        localStorage.removeItem("token");
+        setToken(null);
+        setUser(null);
+      } else {
+        toast.error(error.response?.data?.message || error.message);
+      }
     } finally {
       setLoadingUser(false);
     }
@@ -75,9 +87,9 @@ export const AppContextProvider = ({ children }) => {
   useEffect(() => {
     if (token) {
       fetchUser();
-    }else{
+    } else {
       setUser(null);
-      setLoadingUser(false)
+      setLoadingUser(false);
     }
   }, [token]);
 
@@ -114,7 +126,7 @@ export const AppContextProvider = ({ children }) => {
     fetchUsersChat,
     token,
     setToken,
-    axios
+    axios,
   };
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };
