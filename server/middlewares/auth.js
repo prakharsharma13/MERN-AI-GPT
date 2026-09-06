@@ -2,12 +2,20 @@ import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 
 export const protect = async (req, res, next) => {
-  let token = req.headers.authorization;
+  const header = req.headers.authorization || "";
+  let token = header.startsWith("Bearer ") ? header.slice(7) : header;
+  let userId;
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const userId = decoded.id;
-
+    userId = decoded.id;
+  } catch (error) {
+    return res.status(401).json({
+      success: false,
+      message: "Not authorized, token failed!",
+    });
+  }
+  try {
     const user = await User.findById(userId);
     if (!user) {
       return res.json({
@@ -19,8 +27,10 @@ export const protect = async (req, res, next) => {
     req.user = user;
     next();
   } catch (error) {
-    return res.status(401).json({
-      message: "Not authorized, token failed!",
+    console.error("protect: user lookup failed", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while verifiying session",
     });
   }
 };
