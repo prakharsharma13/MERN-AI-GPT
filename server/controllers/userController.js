@@ -29,7 +29,7 @@ export const registerUser = async (req, res) => {
     res.json({ success: true, token });
   } catch (error) {
     return res.json({
-      success: "false",
+      success: false,
       message: error.message,
     });
   }
@@ -48,16 +48,16 @@ export const loginUser = async (req, res) => {
       if (isMatch) {
         const token = generateToken(user._id);
         return res.json({
-          success: "true",
+          success: true,
           token,
         });
       }
     }
 
-    return res.json({ success: "false", message: "Invaild email or password" });
+    return res.json({ success: false, message: "Invalid email or password" });
   } catch (error) {
     return res.json({
-      success: "false",
+      success: false,
       message: error.message,
     });
   }
@@ -71,7 +71,7 @@ export const getUser = async (req, res) => {
     return res.json({ success: true, user });
   } catch (error) {
     return res.json({
-      success: "false",
+      success: false,
       message: error.message,
     });
   }
@@ -85,19 +85,19 @@ export const getPublishedImages = async (req, res) => {
       {
         $match: {
           "message.isImage": true,
-          "message.isPublished": true
-        }
+          "message.isPublished": true,
+        },
       },
       {
         $project: {
           _id: 0,
           imageUrl: "$messages.content",
-          userName: "$username"
-        }
-      }
-    ])
-    res.json({success: true, images: publishedImageMessages.reverse()})
+          userName: "$username",
+        },
+      },
+    ]);
+    res.json({ success: true, images: publishedImageMessages.reverse() });
   } catch (error) {
-    res.json({success: false, error: error.message})
+    res.json({ success: false, error: error.message });
   }
-}
+};
