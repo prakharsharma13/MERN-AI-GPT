@@ -29,7 +29,13 @@ export const AppContextProvider = ({ children }) => {
         toast.error(data.message);
       }
     } catch (error) {
-      toast.error(error.message);
+      if (error.response?.status === 401) {
+        localStorage.removeItem("token");
+        setToken(null);
+        setUser(null);
+      } else {
+        toast.error(error.response?.data?.message || error.message);
+      }
     } finally {
       setLoadingUser(false);
     }
@@ -75,9 +81,9 @@ export const AppContextProvider = ({ children }) => {
   useEffect(() => {
     if (token) {
       fetchUser();
-    }else{
+    } else {
       setUser(null);
-      setLoadingUser(false)
+      setLoadingUser(false);
     }
   }, [token]);
 
@@ -114,7 +120,7 @@ export const AppContextProvider = ({ children }) => {
     fetchUsersChat,
     token,
     setToken,
-    axios
+    axios,
   };
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };

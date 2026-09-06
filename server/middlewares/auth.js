@@ -18,7 +18,7 @@ export const protect = async (req, res, next) => {
   try {
     const user = await User.findById(userId);
     if (!user) {
-      return res.json({
+      return res.status(401).json({
         success: false,
         message: "Not authorized, user not found",
       });
