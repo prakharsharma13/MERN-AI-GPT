@@ -11,7 +11,7 @@ const ChatSchema = new mongoose.Schema(
         isPublished: { type: Boolean, default: false },
         role: { type: String, required: true },
         content: { type: String, required: true },
-        timestamps: { type: Number, reuired: true },
+        timestamps: { type: Number, default: Date.now },
       },
     ],
   },
