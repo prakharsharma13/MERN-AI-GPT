@@ -94,14 +94,33 @@ export const AppContextProvider = ({ children }) => {
     }
   }, [token]);
 
+  //Append a message to a chat and move that chat to the top of the list
+  const addMessageToChat = (chatId, message) => {
+    const withMessage = (chat) => ({
+      ...chat,
+      messages: [...chat.messages, message],
+      updatedAt: new Date().toISOString(),
+    });
+
+    setChats((prev) => {
+      const chat = prev.find((c) => c._id === chatId);
+      if (!chat) return prev;
+      return [withMessage(chat), ...prev.filter((c) => c._id !== chatId)];
+    });
+    setSelectedChat((prev) => (prev?._id === chatId ? withMessage(prev) : prev));
+  };
+
+  //Only refetch chats when the logged-in user changes, not on every credit update
+  const userId = user?._id;
+
   useEffect(() => {
-    if (user) {
+    if (userId) {
       fetchUsersChat();
     } else {
       setChats([]);
       setSelectedChat(null);
     }
-  }, [user]);
+  }, [userId]);
 
   useEffect(() => {
     if (theme === "dark") {
@@ -125,6 +144,7 @@ export const AppContextProvider = ({ children }) => {
     createNewChat,
     loadingUser,
     fetchUsersChat,
+    addMessageToChat,
     token,
     setToken,
     axios,

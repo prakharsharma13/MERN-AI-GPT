@@ -6,9 +6,12 @@ import toast from "react-hot-toast";
 
 const ChatBox = () => {
   const containerRef = useRef(null);
-  const { selectedChat, theme, user, axios, token, setUser } = useAppContext();
-  const [messages, setMessages] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const { selectedChat, theme, user, axios, token, setUser, addMessageToChat } =
+    useAppContext();
+  const messages = selectedChat?.messages || [];
+  //Chat the in-flight request was sent from, so its reply lands there
+  const [loadingChatId, setLoadingChatId] = useState(null);
+  const loading = loadingChatId !== null;
   const [prompt, setPrompt] = useState("");
   const [mode, setMode] = useState("text");
   const [isPublished, setIsPublished] = useState(false);
@@ -17,24 +20,22 @@ const ChatBox = () => {
     e.preventDefault();
     try {
       if (!user) return toast("Login to send message");
-      setLoading(true);
+      const chatId = selectedChat._id;
+      setLoadingChatId(chatId);
 
       const promptCopy = prompt;
       setPrompt("");
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "User",
-          content: prompt,
-          timestamp: Date.now(),
-          isImage: false,
-        },
-      ]);
+      addMessageToChat(chatId, {
+        role: "User",
+        content: prompt,
+        timestamp: Date.now(),
+        isImage: false,
+      });
 
       const { data } = await axios.post(
         `/api/message/${mode}`,
         {
-          chatId: selectedChat._id,
+          chatId,
           prompt,
           isPublished,
         },
@@ -44,7 +45,7 @@ const ChatBox = () => {
       );
 
       if (data.success) {
-        setMessages((prev) => [...prev, data.reply]);
+        addMessageToChat(chatId, data.reply);
 
         //decrease credits
         if (mode === "image") {
@@ -60,15 +61,9 @@ const ChatBox = () => {
       toast.error(error.response?.data?.message || error.message);
     } finally {
       setPrompt("");
-      setLoading(false);
+      setLoadingChatId(null);
     }
   };
-
-  useEffect(() => {
-    if (selectedChat) {
-      setMessages(selectedChat.messages);
-    }
-  }, [selectedChat]);
 
   useEffect(() => {
     if (containerRef.current) {
@@ -77,7 +72,7 @@ const ChatBox = () => {
         behaviour: "smooth",
       });
     }
-  }, [messages]);
+  }, [selectedChat]);
 
   return (
     <div className="flex-1 flex flex-col justify-between m-5 md:m-10 xl:mx-30 max-md:mt-14 2xl:pr-40">
@@ -105,7 +100,7 @@ const ChatBox = () => {
           <Message key={index} message={message} />
         ))}
 
-        {loading && (
+        {loading && loadingChatId === selectedChat?._id && (
           <div className="loader flex items-center gap-1.5">
             <div className="w-1.5 h-1.5 rounded-full bg-gray-500 dark:bg-white animate-bounce"></div>
             <div className="w-1.5 h-1.5 rounded-full bg-gray-500 dark:bg-white animate-bounce"></div>
