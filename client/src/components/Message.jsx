@@ -73,6 +73,9 @@ const GeneratedImage = ({ src }) => {
 };
 
 const Message = ({ message }) => {
+  // messages saved before the schema fix store the time under `timestamps`
+  const sentAt = moment(message.timestamp ?? message.timestamps).fromNow();
+
   useEffect(() => {
     Prism.highlightAll();
   }, [message.content]);
@@ -84,7 +87,7 @@ const Message = ({ message }) => {
           <div className="flex flex-col gap-2 p-2 px-4 bg-slate-50 dark:bg-[#57317C]/30 border border-[#806094]/30 rounded-md max-w-2xl">
             <p className="text-sm dark:text-primary">{message.content}</p>
             <span className="text-xs text-gray-400 dark:text-[#B1A6C0]">
-              {moment(message.timestamp).fromNow()}
+              {sentAt}
             </span>
           </div>
           <img src={assets.user_icon} className="w-8 rounded-full" alt="" />
@@ -99,7 +102,7 @@ const Message = ({ message }) => {
             </div>
           )}
           <span className="text-xs text-gray-400 dark:text-[#B1A6C0]">
-            {moment(message.timestamp).fromNow()}
+            {sentAt}
           </span>
         </div>
       )}
