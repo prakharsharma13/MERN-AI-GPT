@@ -2,6 +2,24 @@ import openai from "../configs/openai.js";
 import Chat from "../models/Chat.js";
 import User from "../models/User.js";
 
+//Max number of chat messages (including the new prompt) sent to the model
+const MAX_HISTORY_MESSAGES = 20;
+
+//Convert stored chat messages into the format the chat completions API expects
+const toModelMessages = (messages) => {
+  const recent = messages.slice(-MAX_HISTORY_MESSAGES);
+  //Start on a user turn; the last message is always the new prompt
+  const start = recent.findIndex((message) => message.role === "User");
+
+  return recent.slice(start).map((message) => ({
+    role: message.role === "User" ? "user" : "assistant",
+    //Image replies are stored as URLs, so describe them instead of sending the URL
+    content: message.isImage
+      ? "[Generated an image for the previous prompt]"
+      : message.content,
+  }));
+};
+
 //Text generation
 export const textMessageController = async (req, res) => {
   const userId = req.user._id;
@@ -25,12 +43,7 @@ export const textMessageController = async (req, res) => {
 
     const { choices } = await openai.chat.completions.create({
       model: "gemini-2.5-flash",
-      messages: [
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
+      messages: toModelMessages(chat.messages),
     });
 
     const reply = {
