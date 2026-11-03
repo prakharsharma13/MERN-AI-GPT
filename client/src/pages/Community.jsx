@@ -1,14 +1,29 @@
 import React, { useEffect, useState } from "react";
-import { dummyPublishedImages } from "../assets/assets";
 import Loading from "./Loading";
+import { useAppContext } from "../context/AppContext";
 
 const Community = () => {
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const { axios, token } = useAppContext();
 
   const fetchImages = async () => {
-    setImages(dummyPublishedImages);
-    setLoading(false);
+    try {
+      const { data } = await axios.get("/api/user/published-images", {
+        headers: { Authorization: token },
+      });
+
+      if (data.success) {
+        setImages(data.images);
+      } else {
+        setError(data.message);
+      }
+    } catch (error) {
+      setError(error.response?.data?.message || error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -23,7 +38,9 @@ const Community = () => {
         Community Images
       </h2>
 
-      {images.length > 0 ? (
+      {error ? (
+        <p className="text-red-400">Couldn't load community images: {error}</p>
+      ) : images.length > 0 ? (
         <div className="flex flex-wrap max-sm:justify-center gap-5">
           {images.map((item, idx) => (
             <a

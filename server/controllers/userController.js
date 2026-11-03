@@ -93,10 +93,13 @@ export const getPublishedImages = async (req, res) => {
           _id: 0,
           imageUrl: "$messages.content",
           userName: "$userName",
+          //older messages store their time under `timestamps`
+          createdAt: { $ifNull: ["$messages.timestamp", "$messages.timestamps"] },
         },
       },
+      { $sort: { createdAt: -1 } },
     ]);
-    res.json({ success: true, images: publishedImageMessages.reverse() });
+    res.json({ success: true, images: publishedImageMessages });
   } catch (error) {
     res.json({ success: false, message: error.message });
   }
