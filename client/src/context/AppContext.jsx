@@ -20,6 +20,7 @@ export const AppContextProvider = ({ children }) => {
       localStorage.removeItem("token");
       return null;
     }
+    return stored;
   });
   const [loadingUser, setLoadingUser] = useState(true);
 
