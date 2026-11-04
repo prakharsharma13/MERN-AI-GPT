@@ -1,6 +1,5 @@
 import Stripe from "stripe";
-import User from "../models/User.js";
-import Transaction from "../models/Transaction.js";
+import { fulfillTransaction } from "./creditController.js";
 
 export const stripeWebHooks = async (req, res) => {
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -27,24 +26,11 @@ export const stripeWebHooks = async (req, res) => {
         });
 
         const session = sessionList.data[0];
-        const { transactionId, appId } = session.metadata;
+        const { transactionId, appId } = session?.metadata || {};
 
-        if (appId === "quickgpt") {
-          const transaction = await Transaction.findOne({
-            _id: transactionId,
-            isPaid: false,
-          });
-
-          //Update credits in user account
-          await User.updateOne(
-            { _id: transaction.userId },
-            { $inc: { credits: transaction.credits } },
-          );
-
-          //Update credits payment status
-          transaction.isPaid = true;
-
-          await transaction.save();
+        if (appId === "quickgpt" && transactionId) {
+          //no-op if the Loading page's verify call already added the credits
+          await fulfillTransaction(transactionId);
         } else {
           return res.json({
             received: true,

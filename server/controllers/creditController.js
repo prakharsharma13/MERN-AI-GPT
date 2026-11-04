@@ -1,4 +1,5 @@
 import Transaction from "../models/Transaction.js";
+import User from "../models/User.js";
 import Stripe from "stripe";
 
 const plans = [
@@ -87,7 +88,8 @@ export const purchasePlan = async (req, res) => {
           quantity: 1,
         },
       ],
-      success_url: `${origin}/loading`,
+      //Stripe fills in {CHECKOUT_SESSION_ID}; the Loading page uses it to confirm the payment
+      success_url: `${origin}/loading?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}`,
       metadata: {
         transactionId: transaction._id.toString(),
@@ -98,6 +100,67 @@ export const purchasePlan = async (req, res) => {
     });
 
     res.json({ success: true, url: session.url });
+  } catch (error) {
+    res.json({ success: false, message: error.message });
+  }
+};
+
+//Mark a transaction as paid and add its credits, exactly once.
+//Both the Stripe webhook and verifyPurchase call this, in either order.
+export const fulfillTransaction = async (transactionId) => {
+  //atomic claim, so two concurrent callers can't both add the credits
+  const transaction = await Transaction.findOneAndUpdate(
+    { _id: transactionId, isPaid: false },
+    { isPaid: true },
+  );
+  if (!transaction) return false; //already fulfilled (or unknown)
+
+  try {
+    await User.updateOne(
+      { _id: transaction.userId },
+      { $inc: { credits: transaction.credits } },
+    );
+  } catch (error) {
+    //release the claim so a retry (e.g. Stripe resending the webhook) can add the credits
+    await Transaction.updateOne({ _id: transactionId }, { isPaid: false });
+    throw error;
+  }
+  return true;
+};
+
+//-----------------Controller for confirming a purchase on return from Checkout----------------
+//Doesn't wait for the webhook: checks the Checkout Session with Stripe directly.
+export const verifyPurchase = async (req, res) => {
+  const { sessionId } = req.body;
+
+  try {
+    if (typeof sessionId !== "string" || !sessionId) {
+      return res.json({ success: false, message: "Missing checkout session" });
+    }
+
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    const { transactionId, appId } = session.metadata || {};
+    const transaction =
+      appId === "quickgpt" && transactionId
+        ? await Transaction.findById(transactionId)
+        : null;
+
+    //only the user who started the purchase can confirm it
+    if (!transaction || !transaction.userId.equals(req.user._id)) {
+      return res.json({ success: false, message: "Purchase not found" });
+    }
+
+    if (session.payment_status !== "paid") {
+      return res.json({
+        success: false,
+        pending: true,
+        message: "Payment is still processing",
+      });
+    }
+
+    await fulfillTransaction(transactionId);
+    const user = await User.findById(req.user._id);
+    res.json({ success: true, credits: user.credits });
   } catch (error) {
     res.json({ success: false, message: error.message });
   }
