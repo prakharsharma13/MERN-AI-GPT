@@ -6,8 +6,16 @@ import toast from "react-hot-toast";
 
 const ChatBox = () => {
   const containerRef = useRef(null);
-  const { selectedChat, theme, user, axios, token, setUser, addMessageToChat } =
-    useAppContext();
+  const {
+    selectedChat,
+    theme,
+    user,
+    axios,
+    token,
+    setUser,
+    addMessageToChat,
+    removeMessageFromChat,
+  } = useAppContext();
   const messages = selectedChat?.messages || [];
   //Chat the in-flight request was sent from, so its reply lands there
   const [loadingChatId, setLoadingChatId] = useState(null);
@@ -18,25 +26,35 @@ const ChatBox = () => {
 
   const onSubmit = async (e) => {
     e.preventDefault();
+    if (!user) return toast("Login to send message");
+
+    const chatId = selectedChat._id;
+    const promptCopy = prompt;
+    const userMessage = {
+      role: "User",
+      content: promptCopy,
+      timestamp: Date.now(),
+      isImage: false,
+    };
+
+    //Undo the optimistic message (the server didn't save it) and give the prompt back
+    const rollback = (message) => {
+      toast.error(message);
+      removeMessageFromChat(chatId, userMessage);
+      //don't overwrite anything typed while the request was in flight
+      setPrompt((current) => current || promptCopy);
+    };
+
+    setLoadingChatId(chatId);
+    setPrompt("");
+    addMessageToChat(chatId, userMessage);
+
     try {
-      if (!user) return toast("Login to send message");
-      const chatId = selectedChat._id;
-      setLoadingChatId(chatId);
-
-      const promptCopy = prompt;
-      setPrompt("");
-      addMessageToChat(chatId, {
-        role: "User",
-        content: prompt,
-        timestamp: Date.now(),
-        isImage: false,
-      });
-
       const { data } = await axios.post(
         `/api/message/${mode}`,
         {
           chatId,
-          prompt,
+          prompt: promptCopy,
           isPublished,
         },
         {
@@ -54,13 +72,11 @@ const ChatBox = () => {
           setUser((prev) => ({ ...prev, credits: prev.credits - 1 }));
         }
       } else {
-        toast.error(data.message);
-        setPrompt(promptCopy);
+        rollback(data.message);
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || error.message);
+      rollback(error.response?.data?.message || error.message);
     } finally {
-      setPrompt("");
       setLoadingChatId(null);
     }
   };
