@@ -40,7 +40,8 @@ export const loginUser = async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    const user = await User.findOne({ email });
+    // password is select: false on the schema, so ask for it explicitly here
+    const user = await User.findOne({ email }).select("+password");
 
     if (user) {
       const isMatch = await bcrypt.compare(password, user.password);
