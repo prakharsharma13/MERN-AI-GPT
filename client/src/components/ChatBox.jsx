@@ -27,6 +27,8 @@ const ChatBox = () => {
   const onSubmit = async (e) => {
     e.preventDefault();
     if (!user) return toast("Login to send message");
+    //e.g. the first chat couldn't be created
+    if (!selectedChat) return toast("Create a new chat first");
 
     const chatId = selectedChat._id;
     const promptCopy = prompt;

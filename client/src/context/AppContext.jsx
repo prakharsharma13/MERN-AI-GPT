@@ -48,17 +48,33 @@ export const AppContextProvider = ({ children }) => {
     }
   };
 
-  const createNewChat = async () => {
+  //Create a chat, put it at the top of the list and select it.
+  //Makes exactly one request and never retries; shows one toast on failure.
+  const createChat = async () => {
     try {
-      if (!user) return toast("Login to create a new chat");
-      navigate("/");
-      await axios.get("/api/chat/create", {
+      const { data } = await axios.get("/api/chat/create", {
         headers: { Authorization: token },
       });
-      await fetchUsersChat();
+
+      if (!data.success) {
+        toast.error(data.message || "Couldn't create a new chat");
+        return false;
+      }
+
+      setChats((prev) => [data.chat, ...prev]);
+      setSelectedChat(data.chat);
+      return true;
     } catch (error) {
-      toast.error(error.message);
+      toast.error(error.response?.data?.message || error.message);
+      return false;
     }
+  };
+
+  //"New Chat" button: open the chat page with a fresh chat
+  const createNewChat = async () => {
+    if (!user) return toast("Login to create a new chat");
+    navigate("/");
+    await createChat();
   };
 
   const fetchUsersChat = async () => {
@@ -67,21 +83,22 @@ export const AppContextProvider = ({ children }) => {
         headers: { Authorization: token },
       });
 
-      if (data.success) {
-        setChats(data.chats);
-
-        //If user has no chats, then we will create new one
-        if (data.chats.length === 0) {
-          await createNewChat();
-          return fetchUsersChat();
-        } else {
-          setSelectedChat(data.chats[0]);
-        }
-      } else {
+      if (!data.success) {
         toast.error(data.message);
+        return;
+      }
+
+      setChats(data.chats);
+      if (data.chats.length > 0) {
+        setSelectedChat(data.chats[0]);
+      } else {
+        //No chats yet: create the first one once, without leaving the current page.
+        //If that fails, stop here; the user can retry with the "New Chat" button.
+        setSelectedChat(null);
+        await createChat();
       }
     } catch (error) {
-      toast.error(error.message);
+      toast.error(error.response?.data?.message || error.message);
     }
   };
 
