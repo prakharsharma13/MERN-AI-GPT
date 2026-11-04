@@ -11,8 +11,9 @@ export const createChat = async (req, res) => {
       name: "New Chat",
       userName: req.user.name,
     };
-    await Chat.create(chatData);
-    res.json({ success: true, message: "Chat created" });
+    //Return the new chat so the client doesn't have to refetch the whole list
+    const chat = await Chat.create(chatData);
+    res.json({ success: true, message: "Chat created", chat });
   } catch (error) {
     res.json({ success: false, message: error.message });
   }
