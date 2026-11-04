@@ -110,6 +110,21 @@ export const AppContextProvider = ({ children }) => {
     setSelectedChat((prev) => (prev?._id === chatId ? withMessage(prev) : prev));
   };
 
+  //Remove a message added with addMessageToChat (matched by reference), e.g. when sending it failed
+  const removeMessageFromChat = (chatId, message) => {
+    const withoutMessage = (chat) => ({
+      ...chat,
+      messages: chat.messages.filter((m) => m !== message),
+    });
+
+    setChats((prev) =>
+      prev.map((c) => (c._id === chatId ? withoutMessage(c) : c)),
+    );
+    setSelectedChat((prev) =>
+      prev?._id === chatId ? withoutMessage(prev) : prev,
+    );
+  };
+
   //Only refetch chats when the logged-in user changes, not on every credit update
   const userId = user?._id;
 
@@ -145,6 +160,7 @@ export const AppContextProvider = ({ children }) => {
     loadingUser,
     fetchUsersChat,
     addMessageToChat,
+    removeMessageFromChat,
     token,
     setToken,
     axios,
