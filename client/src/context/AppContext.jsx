@@ -104,7 +104,14 @@ export const AppContextProvider = ({ children }) => {
 
       setChats(data.chats);
       if (data.chats.length > 0) {
-        setSelectedChat(data.chats[0]);
+        //Keep the open chat if it still exists (e.g. another chat was deleted);
+        //otherwise (first load, or the open chat was deleted) open the most recent one.
+        //The open chat is kept as-is so an in-flight optimistic message isn't lost.
+        setSelectedChat((prev) =>
+          prev && data.chats.some((c) => c._id === prev._id)
+            ? prev
+            : data.chats[0],
+        );
       } else {
         //No chats yet: create the first one once, without leaving the current page.
         //If that fails, stop here; the user can retry with the "New Chat" button.
