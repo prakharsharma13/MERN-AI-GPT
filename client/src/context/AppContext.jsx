@@ -50,18 +50,25 @@ export const AppContextProvider = ({ children }) => {
 
   //Create a chat, put it at the top of the list and select it.
   //Makes exactly one request and never retries; shows one toast on failure.
+  //The server hands back the user's existing empty chat instead of a new one if there is one.
   const createChat = async () => {
     try {
-      const { data } = await axios.get("/api/chat/create", {
-        headers: { Authorization: token },
-      });
+      const { data } = await axios.post(
+        "/api/chat/create",
+        {},
+        { headers: { Authorization: token } },
+      );
 
       if (!data.success) {
         toast.error(data.message || "Couldn't create a new chat");
         return false;
       }
 
-      setChats((prev) => [data.chat, ...prev]);
+      //the returned chat may already be in the list (a reused empty chat)
+      setChats((prev) => [
+        data.chat,
+        ...prev.filter((c) => c._id !== data.chat._id),
+      ]);
       setSelectedChat(data.chat);
       return true;
     } catch (error) {
@@ -70,10 +77,17 @@ export const AppContextProvider = ({ children }) => {
     }
   };
 
-  //"New Chat" button: open the chat page with a fresh chat
+  //"New Chat" button: open the chat page with an empty chat,
+  //reusing one that's already in the list instead of creating another
   const createNewChat = async () => {
     if (!user) return toast("Login to create a new chat");
     navigate("/");
+
+    const emptyChat = chats.find((c) => c.messages.length === 0);
+    if (emptyChat) {
+      setSelectedChat(emptyChat);
+      return;
+    }
     await createChat();
   };
 

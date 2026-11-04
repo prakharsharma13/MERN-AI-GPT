@@ -1,10 +1,19 @@
 import Chat from "../models/Chat.js";
 
-//Creating a new chat
+//Creating a new chat (or reusing the user's empty one, so empty chats don't pile up)
 export const createChat = async (req, res) => {
   const userId = req.user._id;
 
   try {
+    const emptyChat = await Chat.findOne({
+      userId,
+      "messages.0": { $exists: false },
+    }).sort({ updatedAt: -1 });
+
+    if (emptyChat) {
+      return res.json({ success: true, message: "Chat reused", chat: emptyChat });
+    }
+
     const chatData = {
       userId,
       messages: [],
