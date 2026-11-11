@@ -1,4 +1,5 @@
 import Chat from "../models/Chat.js";
+import { isValidObjectIdString } from "../utils/validateId.js";
 
 //Creating a new chat (or reusing the user's empty one, so empty chats don't pile up)
 export const createChat = async (req, res) => {
@@ -43,13 +44,26 @@ export const getChats = async (req, res) => {
 //Delete a chat
 export const deleteChat = async (req, res) => {
   const userId = req.user._id;
-  const { chatId } = req.body;
+  const { chatId } = req.body || {};
 
   try {
-    await Chat.deleteOne({ _id: chatId, userId });
+    if (!isValidObjectIdString(chatId)) {
+      return res.status(400).json({
+        success: false,
+        message: !chatId ? "Chat ID is required" : "Invalid chat ID",
+      });
+    }
+
+    const result = await Chat.deleteOne({ _id: chatId, userId });
+    if (result.deletedCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Chat not found",
+      });
+    }
 
     res.json({ success: true, message: "Chat Deleted!" });
   } catch (error) {
-    res.json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 };

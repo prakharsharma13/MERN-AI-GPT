@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import openai from "../configs/openai.js";
 import Chat from "../models/Chat.js";
 import User from "../models/User.js";
+import { isValidObjectIdString } from "../utils/validateId.js";
 
 //Max number of chat messages (including the new prompt) sent to the model
 const MAX_HISTORY_MESSAGES = 20;
@@ -173,20 +174,52 @@ const failImageAndRefund = async ({
   }
 };
 
+//Validate chatId + prompt and load the user's chat; sends a 400/404 response and returns null on failure
+const loadAuthorizedChatForPrompt = async ({ userId, chatId, prompt, res }) => {
+  if (!isValidObjectIdString(chatId)) {
+    res.status(400).json({
+      success: false,
+      message: !chatId ? "Chat ID is required" : "Invalid chat ID",
+    });
+    return null;
+  }
+
+  if (typeof prompt !== "string" || !prompt.trim()) {
+    res.status(400).json({ success: false, message: "Prompt is required" });
+    return null;
+  }
+
+  const chat = await Chat.findOne({ userId, _id: chatId });
+  if (!chat) {
+    res.status(404).json({ success: false, message: "Chat not found" });
+    return null;
+  }
+
+  return chat;
+};
+
 //Text generation
 export const textMessageController = async (req, res) => {
   const userId = req.user._id;
-  const { chatId, prompt } = req.body;
+  const { chatId, prompt } = req.body || {};
 
   try {
-    //check credist
+    const chat = await loadAuthorizedChatForPrompt({
+      userId,
+      chatId,
+      prompt,
+      res,
+    });
+    if (!chat) return;
+
+    //check credits
     if (req.user.credits < 1) {
       return res.json({
         success: false,
         message: "You don't have enough credits",
       });
     }
-    const chat = await Chat.findOne({ userId, _id: chatId });
+
     chat.messages.push({
       role: "User",
       content: prompt,
@@ -207,8 +240,12 @@ export const textMessageController = async (req, res) => {
 
     chat.messages.push(reply);
     await chat.save();
-    await User.updateOne({ _id: userId }, { $inc: { credits: -1 } });
-    res.json({ success: true, reply });
+    const updatedUser = await User.findOneAndUpdate(
+      { _id: userId, credits: { $gte: 1 } },
+      { $inc: { credits: -1 } },
+      { new: true },
+    );
+    res.json({ success: true, reply, credits: updatedUser?.credits });
   } catch (error) {
     res.json({ success: false, message: error.message });
   }
@@ -217,13 +254,17 @@ export const textMessageController = async (req, res) => {
 //Image generation
 export const imageMessageController = async (req, res) => {
   const userId = req.user._id;
-  const { prompt, chatId, isPublished } = req.body;
+  const { prompt, chatId, isPublished } = req.body || {};
   let creditsReserved = false;
 
   try {
-    if (typeof prompt !== "string" || !prompt.trim()) {
-      return res.json({ success: false, message: "Prompt is required" });
-    }
+    const chat = await loadAuthorizedChatForPrompt({
+      userId,
+      chatId,
+      prompt,
+      res,
+    });
+    if (!chat) return;
 
     const endpoint = getImageKitEndpoint();
     if (!endpoint) {
@@ -231,15 +272,6 @@ export const imageMessageController = async (req, res) => {
         success: false,
         message: "Image service is not configured",
       });
-    }
-
-    if (!mongoose.isValidObjectId(chatId)) {
-      return res.json({ success: false, message: "Chat not found" });
-    }
-
-    const chat = await Chat.findOne({ userId, _id: chatId });
-    if (!chat) {
-      return res.json({ success: false, message: "Chat not found" });
     }
 
     //Atomically reserve 2 credits so concurrent requests cannot double-spend
@@ -318,17 +350,17 @@ export const imageMessageController = async (req, res) => {
 //Check async ImageKit generation progress and refund reserved credits if generation fails
 export const imageStatusController = async (req, res) => {
   const userId = req.user._id;
-  const { chatId, messageId } = req.body;
+  const { chatId, messageId } = req.body || {};
 
   try {
     if (
-      !mongoose.isValidObjectId(chatId) ||
-      !mongoose.isValidObjectId(messageId)
+      !isValidObjectIdString(chatId) ||
+      !isValidObjectIdString(messageId)
     ) {
-      return res.json({
+      return res.status(400).json({
         success: false,
         notFound: true,
-        message: "Image message not found",
+        message: "Invalid chat or message ID",
       });
     }
 
@@ -338,7 +370,7 @@ export const imageStatusController = async (req, res) => {
     const chat = await Chat.findOne({ _id: chatObjectId, userId });
     const message = findSubmessage(chat, messageObjectId);
     if (!message || !message.isImage) {
-      return res.json({
+      return res.status(404).json({
         success: false,
         notFound: true,
         message: "Image message not found",
