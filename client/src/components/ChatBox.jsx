@@ -67,8 +67,10 @@ const ChatBox = () => {
       if (data.success) {
         addMessageToChat(chatId, data.reply);
 
-        //decrease credits
-        if (mode === "image") {
+        //decrease credits (prefer authoritative server balance when provided)
+        if (typeof data.credits === "number") {
+          setUser((prev) => (prev ? { ...prev, credits: data.credits } : prev));
+        } else if (mode === "image") {
           setUser((prev) => ({ ...prev, credits: prev.credits - 2 }));
         } else {
           setUser((prev) => ({ ...prev, credits: prev.credits - 1 }));

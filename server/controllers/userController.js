@@ -87,6 +87,7 @@ export const getPublishedImages = async (req, res) => {
         $match: {
           "messages.isImage": true,
           "messages.isPublished": true,
+          "messages.imageStatus": { $nin: ["generating", "failed"] },
         },
       },
       {

@@ -1,10 +1,21 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import { dummyChats, dummyUserData } from "../assets/assets";
 import axios from "axios";
 import toast from "react-hot-toast";
 
 axios.defaults.baseURL = import.meta.env.VITE_SERVER_URL;
+
+const IMAGE_POLL_INTERVAL_MS = 5000;
+const IMAGE_CLIENT_POLL_MAX_MS = 210000;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const AppContext = createContext();
 
@@ -23,6 +34,8 @@ export const AppContextProvider = ({ children }) => {
     return stored;
   });
   const [loadingUser, setLoadingUser] = useState(true);
+  const imagePollsRef = useRef(new Map());
+  const pollAuthRef = useRef({ token: null, userId: null });
 
   const fetchUser = async () => {
     try {
@@ -163,6 +176,23 @@ export const AppContextProvider = ({ children }) => {
     );
   };
 
+  //Update fields on a saved message in a chat (e.g. async image status)
+  const updateMessageInChat = useCallback((chatId, messageId, updates) => {
+    const withUpdates = (chat) => ({
+      ...chat,
+      messages: chat.messages.map((m) =>
+        m._id === messageId ? { ...m, ...updates } : m,
+      ),
+    });
+
+    setChats((prev) =>
+      prev.map((c) => (c._id === chatId ? withUpdates(c) : c)),
+    );
+    setSelectedChat((prev) =>
+      prev?._id === chatId ? withUpdates(prev) : prev,
+    );
+  }, []);
+
   //Only refetch chats when the logged-in user changes, not on every credit update
   const userId = user?._id;
 
@@ -174,6 +204,134 @@ export const AppContextProvider = ({ children }) => {
       setSelectedChat(null);
     }
   }, [userId]);
+
+  //Poll pending image generations across all chats and sync status/refunded credits
+  useEffect(() => {
+    const activePolls = imagePollsRef.current;
+
+    if (
+      pollAuthRef.current.token !== token ||
+      pollAuthRef.current.userId !== userId
+    ) {
+      for (const stop of activePolls.values()) stop();
+      activePolls.clear();
+      pollAuthRef.current = { token, userId };
+    }
+
+    if (!token || !userId) {
+      return;
+    }
+
+    const pending = new Map();
+    for (const chat of chats) {
+      for (const message of chat.messages || []) {
+        if (
+          message.isImage &&
+          message.imageStatus === "generating" &&
+          message._id
+        ) {
+          pending.set(`${chat._id}:${message._id}`, {
+            chatId: chat._id,
+            messageId: message._id,
+            timestamp: message.timestamp,
+          });
+        }
+      }
+    }
+
+    for (const [key, stop] of activePolls.entries()) {
+      if (!pending.has(key)) {
+        stop();
+        activePolls.delete(key);
+      }
+    }
+
+    const startPoll = (key, { chatId, messageId, timestamp }) => {
+      let cancelled = false;
+      const controller = new AbortController();
+
+      const run = async () => {
+        const messageStartedAt = timestamp || Date.now();
+        if (Date.now() - messageStartedAt < IMAGE_POLL_INTERVAL_MS) {
+          await sleep(IMAGE_POLL_INTERVAL_MS);
+        }
+
+        const pollStartedAt = Date.now();
+        let firstCheck = true;
+
+        while (
+          !cancelled &&
+          (firstCheck || Date.now() - pollStartedAt < IMAGE_CLIENT_POLL_MAX_MS)
+        ) {
+          firstCheck = false;
+          try {
+            const { data } = await axios.post(
+              "/api/message/image/status",
+              { chatId, messageId },
+              {
+                headers: { Authorization: token },
+                signal: controller.signal,
+              },
+            );
+            if (cancelled) return;
+
+            if (!data.success) {
+              if (data.notFound) break;
+            } else if (data.status === "ready") {
+              updateMessageInChat(chatId, messageId, { imageStatus: "ready" });
+              if (typeof data.credits === "number") {
+                setUser((prev) =>
+                  prev ? { ...prev, credits: data.credits } : prev,
+                );
+              }
+              break;
+            } else if (data.status === "failed") {
+              updateMessageInChat(chatId, messageId, {
+                imageStatus: "failed",
+                imageError: data.error,
+              });
+              if (typeof data.credits === "number") {
+                setUser((prev) =>
+                  prev ? { ...prev, credits: data.credits } : prev,
+                );
+              }
+              toast.error(
+                `${data.error || "Image generation failed"} — 2 credits refunded`,
+              );
+              break;
+            }
+          } catch (error) {
+            if (cancelled || error.code === "ERR_CANCELED") return;
+            if (error.response?.status === 401) break;
+          }
+
+          await sleep(IMAGE_POLL_INTERVAL_MS);
+        }
+
+        activePolls.delete(key);
+      };
+
+      run();
+      return () => {
+        cancelled = true;
+        controller.abort();
+      };
+    };
+
+    for (const [key, info] of pending.entries()) {
+      if (!activePolls.has(key)) {
+        activePolls.set(key, startPoll(key, info));
+      }
+    }
+  }, [chats, token, userId, updateMessageInChat]);
+
+  useEffect(() => {
+    const activePolls = imagePollsRef.current;
+    return () => {
+      for (const stop of activePolls.values()) stop();
+      activePolls.clear();
+    };
+  }, []);
 
   useEffect(() => {
     if (theme === "dark") {

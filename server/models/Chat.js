@@ -12,6 +12,11 @@ const ChatSchema = new mongoose.Schema(
         role: { type: String, required: true },
         content: { type: String, required: true },
         timestamp: { type: Number },
+        imageStatus: {
+          type: String,
+          enum: ["generating", "ready", "failed"],
+        },
+        imageError: { type: String },
       },
     ],
   },
