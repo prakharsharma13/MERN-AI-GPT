@@ -13,6 +13,7 @@ const ChatBox = () => {
     axios,
     token,
     setUser,
+    loadingChats,
     addMessageToChat,
     removeMessageFromChat,
   } = useAppContext();
@@ -27,11 +28,22 @@ const ChatBox = () => {
   const onSubmit = async (e) => {
     e.preventDefault();
     if (!user) return toast("Login to send message");
-    //e.g. the first chat couldn't be created
-    if (!selectedChat) return toast("Create a new chat first");
+    if (loading) return;
+    //e.g. chats are still loading or the first chat couldn't be created
+    if (!selectedChat?._id) {
+      return toast(
+        loadingChats
+          ? "Chats are still loading, please wait"
+          : "Create a new chat first",
+      );
+    }
+
+    const promptCopy = prompt;
+    if (!promptCopy.trim()) {
+      return toast.error("Please enter a prompt");
+    }
 
     const chatId = selectedChat._id;
-    const promptCopy = prompt;
     const userMessage = {
       role: "User",
       content: promptCopy,
@@ -64,7 +76,7 @@ const ChatBox = () => {
         },
       );
 
-      if (data.success) {
+      if (data.success && data.reply) {
         addMessageToChat(chatId, data.reply);
 
         //decrease credits (prefer authoritative server balance when provided)
@@ -76,7 +88,7 @@ const ChatBox = () => {
           setUser((prev) => ({ ...prev, credits: prev.credits - 1 }));
         }
       } else {
-        rollback(data.message);
+        rollback(data.message || "Failed to send message");
       }
     } catch (error) {
       rollback(error.response?.data?.message || error.message);

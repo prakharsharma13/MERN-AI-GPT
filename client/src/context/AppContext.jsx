@@ -34,6 +34,7 @@ export const AppContextProvider = ({ children }) => {
     return stored;
   });
   const [loadingUser, setLoadingUser] = useState(true);
+  const [loadingChats, setLoadingChats] = useState(false);
   const imagePollsRef = useRef(new Map());
   const pollAuthRef = useRef({ token: null, userId: null });
 
@@ -96,7 +97,7 @@ export const AppContextProvider = ({ children }) => {
     if (!user) return toast("Login to create a new chat");
     navigate("/");
 
-    const emptyChat = chats.find((c) => c.messages.length === 0);
+    const emptyChat = chats.find((c) => c.messages?.length === 0);
     if (emptyChat) {
       setSelectedChat(emptyChat);
       return;
@@ -105,6 +106,7 @@ export const AppContextProvider = ({ children }) => {
   };
 
   const fetchUsersChat = async () => {
+    setLoadingChats(true);
     try {
       const { data } = await axios.get("/api/chat/get", {
         headers: { Authorization: token },
@@ -133,6 +135,8 @@ export const AppContextProvider = ({ children }) => {
       }
     } catch (error) {
       toast.error(error.response?.data?.message || error.message);
+    } finally {
+      setLoadingChats(false);
     }
   };
 
@@ -149,7 +153,7 @@ export const AppContextProvider = ({ children }) => {
   const addMessageToChat = (chatId, message) => {
     const withMessage = (chat) => ({
       ...chat,
-      messages: [...chat.messages, message],
+      messages: [...(chat.messages || []), message],
       updatedAt: new Date().toISOString(),
     });
 
@@ -165,7 +169,7 @@ export const AppContextProvider = ({ children }) => {
   const removeMessageFromChat = (chatId, message) => {
     const withoutMessage = (chat) => ({
       ...chat,
-      messages: chat.messages.filter((m) => m !== message),
+      messages: (chat.messages || []).filter((m) => m !== message),
     });
 
     setChats((prev) =>
@@ -180,7 +184,7 @@ export const AppContextProvider = ({ children }) => {
   const updateMessageInChat = useCallback((chatId, messageId, updates) => {
     const withUpdates = (chat) => ({
       ...chat,
-      messages: chat.messages.map((m) =>
+      messages: (chat.messages || []).map((m) =>
         m._id === messageId ? { ...m, ...updates } : m,
       ),
     });
@@ -302,7 +306,8 @@ export const AppContextProvider = ({ children }) => {
             }
           } catch (error) {
             if (cancelled || error.code === "ERR_CANCELED") return;
-            if (error.response?.status === 401) break;
+            const status = error.response?.status;
+            if (status === 400 || status === 401 || status === 404) break;
           }
 
           await sleep(IMAGE_POLL_INTERVAL_MS);
@@ -354,6 +359,7 @@ export const AppContextProvider = ({ children }) => {
     setTheme,
     createNewChat,
     loadingUser,
+    loadingChats,
     fetchUsersChat,
     addMessageToChat,
     removeMessageFromChat,
