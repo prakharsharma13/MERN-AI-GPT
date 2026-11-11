@@ -7,7 +7,28 @@ import Prism from "prismjs";
 const POLL_INTERVAL_MS = 5000;
 const DEADLINE_MS = 180000; // generation measured at ~60s; generous headroom
 
-const GeneratedImage = ({ src }) => {
+const ImageStatusView = ({ status, src, error }) => {
+  if (status === "failed") {
+    return (
+      <p className="text-sm text-red-400 mt-2">
+        {error || "Image generation failed."}
+      </p>
+    );
+  }
+
+  if (status === "generating") {
+    return (
+      <div className="flex h-48 w-full max-w-md items-center justify-center rounded-md bg-black/20 text-xs text-gray-400 mt-2">
+        Generating image… this can take up to a minute
+      </div>
+    );
+  }
+
+  return <img src={src} alt="" className="w-full max-w-md mt-2 rounded-md" />;
+};
+
+//Fallback for image messages saved before server-tracked imageStatus existed
+const LegacyGeneratedImage = ({ src }) => {
   const [status, setStatus] = useState("generating"); // generating | ready | failed
   const [error, setError] = useState("");
 
@@ -57,19 +78,25 @@ const GeneratedImage = ({ src }) => {
     };
   }, [src]);
 
-  if (status === "failed") {
-    return <p className="text-sm text-red-400 mt-2">{error}</p>;
-  }
+  return <ImageStatusView status={status} src={src} error={error} />;
+};
 
-  if (status === "generating") {
+const GeneratedImage = ({ message }) => {
+  if (
+    message.imageStatus === "generating" ||
+    message.imageStatus === "failed" ||
+    message.imageStatus === "ready"
+  ) {
     return (
-      <div className="flex h-48 w-full max-w-md items-center justify-center rounded-md bg-black/20 text-xs text-gray-400 mt-2">
-        Generating image… this can take up to a minute
-      </div>
+      <ImageStatusView
+        status={message.imageStatus}
+        src={message.content}
+        error={message.imageError}
+      />
     );
   }
 
-  return <img src={src} alt="" className="w-full max-w-md mt-2 rounded-md" />;
+  return <LegacyGeneratedImage src={message.content} />;
 };
 
 const Message = ({ message }) => {
@@ -95,7 +122,7 @@ const Message = ({ message }) => {
       ) : (
         <div className="inline-flex flex-col gap-2 p-2 px-4 max-w-2xl bg-primary/20 dark:bg-[#57317C]/30 border border-[#80609F]/30 rounded-md my-4">
           {message.isImage ? (
-            <GeneratedImage src={message.content} />
+            <GeneratedImage message={message} />
           ) : (
             <div className="text-sm dark:text-primary reset-tw">
               <Markdown>{message.content}</Markdown>
