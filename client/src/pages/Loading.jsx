@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { useAppContext } from "../context/AppContext";
 
@@ -11,26 +11,27 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const Loading = () => {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const [searchParams] = useSearchParams();
   //Set by Stripe when it redirects back here after a successful checkout
   const sessionId = searchParams.get("session_id");
   const { axios, token, user, setUser, loadingUser } = useAppContext();
   const isLoggedIn = Boolean(user);
 
-  //Plain loading screen: go home after a while, as before
+  //Plain loading screen: go home after a while only when on the standalone /loading page
   useEffect(() => {
-    if (sessionId) return;
+    if (pathname !== "/loading" || sessionId) return;
     const timeout = setTimeout(() => {
       navigate("/");
     }, 8000);
 
     return () => clearTimeout(timeout);
-  }, []);
+  }, [pathname, sessionId, navigate]);
 
   //Back from Stripe Checkout: confirm the payment with the server and show the new balance.
   //Doesn't depend on the webhook having arrived yet.
   useEffect(() => {
-    if (!sessionId) return;
+    if (pathname !== "/loading" || !sessionId) return;
     //wait for the initial user fetch, so its (older) balance can't overwrite the new one
     if (loadingUser) return;
     if (!isLoggedIn) {
@@ -80,7 +81,16 @@ const Loading = () => {
     return () => {
       cancelled = true;
     };
-  }, [sessionId, loadingUser, isLoggedIn]);
+  }, [
+    pathname,
+    sessionId,
+    loadingUser,
+    isLoggedIn,
+    axios,
+    navigate,
+    setUser,
+    token,
+  ]);
 
   return (
     <div className="bg-linear-to-b from-[#531B81] to-[#29184B] backdrop-opacity-60 flex items-center justify-center h-screen w-screen text-white text-2xl">
