@@ -10,8 +10,6 @@ import { stripeWebHooks } from "./controllers/webhooks.js";
 
 const app = express();
 
-await connectDB();
-
 //Stripe webhooks
 
 app.post("/api/stripe", express.raw({type: "application/json"}), stripeWebHooks)
@@ -27,6 +25,14 @@ app.use("/api/credit", creditRouter);
 
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
-  console.log(`Server is running on ${PORT}`);
-});
+try {
+  await connectDB();
+  app.listen(PORT, () => {
+    console.log(`Server is running on ${PORT}`);
+  });
+} catch (error) {
+  console.error("Failed to connect to MongoDB, exiting:", error.message);
+  process.exit(1);
+}
+
+export default app;
