@@ -1,15 +1,8 @@
 import mongoose from "mongoose";
 
-const formatMongoURI = (rawUri) => {
-  if (rawUri.includes("/quickgpt")) return rawUri;
-  const [base, query] = rawUri.split("?");
-  const cleanBase = base.replace(/\/+$/, "");
-  return query ? `${cleanBase}/quickgpt?${query}` : `${cleanBase}/quickgpt`;
-};
-
 const connectDB = async () => {
-  const rawUri = process.env.MONGODB_URI || process.env.MONGO_URI;
-  if (!rawUri) {
+  const uri = process.env.MONGODB_URI || process.env.MONGO_URI;
+  if (!uri) {
     throw new Error("MONGODB_URI environment variable is not defined");
   }
 
@@ -29,10 +22,8 @@ const connectDB = async () => {
     console.warn("Database disconnected")
   );
 
-  const connectionString = formatMongoURI(rawUri);
-
   try {
-    await mongoose.connect(connectionString);
+    await mongoose.connect(uri, { dbName: "quickgpt" });
   } catch (error) {
     console.error("Failed to connect to MongoDB:", error.message);
     throw error;
